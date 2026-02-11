@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 // --- IMPORTS ---
 import com.applandeo.materialcalendarview.CalendarView;
-import com.applandeo.materialcalendarview.EventDay;
+import com.applandeo.materialcalendarview.CalendarDay;
 import com.hit.shiftsync.logic.ShiftGenerator;
 import com.hit.shiftsync.models.Shift;
 import com.hit.shiftsync.models.User;
@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 4. Calendar Click Listener
         calendarView.setOnDayClickListener(eventDay -> {
+            // The library now passes a 'CalendarDay' object
             Calendar clickedDayCalendar = eventDay.getCalendar();
             checkForShiftDetails(clickedDayCalendar);
         });
@@ -302,7 +303,9 @@ public class MainActivity extends AppCompatActivity {
     // --- HELPER: Display Shifts on Calendar ---
     private void loadShiftsToCalendar() {
         db.collection("shifts").get().addOnSuccessListener(snapshots -> {
-            List<EventDay> events = new ArrayList<>();
+
+            // CHANGE 1: List<EventDay> -> List<CalendarDay>
+            List<CalendarDay> events = new ArrayList<>();
             String myUid = mAuth.getCurrentUser().getUid();
             int count = 0;
 
@@ -313,14 +316,19 @@ public class MainActivity extends AppCompatActivity {
                     Calendar calendar = Calendar.getInstance();
                     calendar.setTimeInMillis(shift.getStartTime());
 
-                    events.add(new EventDay(calendar, R.drawable.ic_circle_blue));
+                    // CHANGE 2: new EventDay(...) -> new CalendarDay(...)
+                    CalendarDay day = new CalendarDay(calendar);
+                    day.setImageResource(R.drawable.ic_circle_blue);
+                    events.add(day);
+
                     count++;
                 }
             }
 
             int finalCount = count;
             runOnUiThread(() -> {
-                calendarView.setEvents(events);
+                // CHANGE 3: setEvents -> setCalendarDays
+                calendarView.setCalendarDays(events);
                 Toast.makeText(MainActivity.this, "Refreshed: " + finalCount + " shifts", Toast.LENGTH_SHORT).show();
             });
         });
