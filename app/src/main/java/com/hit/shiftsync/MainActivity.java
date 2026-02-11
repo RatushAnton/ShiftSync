@@ -35,6 +35,9 @@ public class MainActivity extends AppCompatActivity {
     private Button adminBtn;
     private CalendarView calendarView;
 
+    // --- NEW: Store the current user so we can check roles later ---
+    private User currentUserData;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -93,8 +96,7 @@ public class MainActivity extends AppCompatActivity {
         long targetDayStart = queryDate.getTimeInMillis();
         long targetDayEnd = targetDayStart + (24 * 60 * 60 * 1000); // 24 hours later
 
-        // 2. SIMPLER QUERY: Get ALL my shifts (No complex range filters on server)
-        // This prevents the "Index Required" error.
+        // 2. SIMPLER QUERY: Get ALL my shifts
         db.collection("shifts")
                 .whereEqualTo("userId", myUid)
                 .get()
@@ -117,13 +119,29 @@ public class MainActivity extends AppCompatActivity {
                         String startStr = sdf.format(new java.util.Date(foundShift.getStartTime()));
                         String endStr = sdf.format(new java.util.Date(foundShift.getEndTime()));
 
-                        new androidx.appcompat.app.AlertDialog.Builder(this)
+                        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this)
                                 .setTitle("Shift Details")
                                 .setMessage("Shift: " + foundShift.getType() +
                                         "\n\nStart: " + startStr +
                                         "\nEnd: " + endStr)
-                                .setPositiveButton("OK", null)
-                                .show();
+                                .setPositiveButton("OK", null);
+
+                        // --- NEW: DELETE BUTTON LOGIC ---
+                        // Only Admins or Managers can delete shifts
+                        if (currentUserData != null &&
+                                ("ADMIN".equalsIgnoreCase(currentUserData.getRole()) ||
+                                        "MANAGER".equalsIgnoreCase(currentUserData.getRole()))) {
+
+                            // We need to capture the shift in a final variable or helper
+                            Shift shiftToDelete = foundShift;
+                            builder.setNegativeButton("DELETE SHIFT", (dialog, which) -> {
+                                confirmDeleteShift(shiftToDelete);
+                            });
+                        }
+                        // --------------------------------
+
+                        builder.show();
+
                     } else {
                         // No shift found -> Ask to Request Day Off
                         String dateString = String.format("%d-%02d-%02d",
@@ -137,6 +155,24 @@ public class MainActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
+    }
+
+    // --- NEW HELPER: Delete Shift ---
+    private void confirmDeleteShift(Shift shift) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Confirm Delete")
+                .setMessage("Are you sure you want to delete this shift?\nThis cannot be undone.")
+                .setPositiveButton("Yes, Delete", (dialog, which) -> {
+
+                    db.collection("shifts").document(shift.getShiftId()).delete()
+                            .addOnSuccessListener(aVoid -> {
+                                Toast.makeText(this, "Shift Deleted", Toast.LENGTH_SHORT).show();
+                                loadShiftsToCalendar(); // Refresh the blue dots
+                            })
+                            .addOnFailureListener(e -> Toast.makeText(this, "Error deleting: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // --- HELPER: Request Day Off ---
@@ -172,12 +208,15 @@ public class MainActivity extends AppCompatActivity {
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
                         User user = documentSnapshot.toObject(User.class);
+
+                        // --- NEW: Save user to global variable ---
+                        this.currentUserData = user;
+                        // -----------------------------------------
+
                         welcomeText.setText("Hello, " + user.getFullName());
                         quotaText.setText("Target Quota: " + user.getShiftQuota());
 
-                        // Inside loadUserData() method:
                         if ("ADMIN".equalsIgnoreCase(user.getRole()) || "MANAGER".equalsIgnoreCase(user.getRole())) {
-                            // Show the Generate button AND the Manage Staff button
                             adminBtn.setVisibility(View.VISIBLE);
 
                             if ("MANAGER".equalsIgnoreCase(user.getRole())) {
@@ -274,7 +313,6 @@ public class MainActivity extends AppCompatActivity {
                     Calendar calendar = Calendar.getInstance();
                     calendar.setTimeInMillis(shift.getStartTime());
 
-                    // Use Vector Asset
                     events.add(new EventDay(calendar, R.drawable.ic_circle_blue));
                     count++;
                 }

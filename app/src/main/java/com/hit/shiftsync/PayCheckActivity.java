@@ -37,25 +37,31 @@ public class PayCheckActivity extends AppCompatActivity {
     }
 
     private void loadPayData() {
+        // 1. Check if we passed a specific user ID (From Manager Screen)
         String targetUid = getIntent().getStringExtra("TARGET_USER_ID");
         String targetName = getIntent().getStringExtra("TARGET_USER_NAME");
 
-        final String uidToCheck = (targetUid != null) ? targetUid : mAuth.getCurrentUser().getUid();
+        // If targetUid is null, it means I am a doctor looking at my own paystub
+        String uidToCheck = (targetUid != null) ? targetUid : mAuth.getCurrentUser().getUid();
 
+        // Optional: Update Title
         if (targetName != null) {
-            TextView header = findViewById(R.id.payPeriodText); // Or the main title
-            // You might want to update the title to say "Paystub: Dr. House"
-            getSupportActionBar().setTitle("Paystub: " + targetName);
+            // If you have a title TextView, you can update it here
+            TextView header = findViewById(R.id.payPeriodText);
+            // header.setText("Paystub for " + targetName);
         }
 
-        // 1. Get User Data (for Hourly Rate)
+        // 2. Fetch User Data
         db.collection("users").document(uidToCheck).get().addOnSuccessListener(userSnap -> {
             User user = userSnap.toObject(User.class);
-            if (user == null) return;
+            if (user == null) {
+                Toast.makeText(this, "User data not found", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
             rateText.setText("Hourly Rate: $" + user.getHourlyRate());
 
-            // 2. Calculate Shifts for THIS Month
+            // 3. Calculate Shifts for THIS Month
             calculateMonthlyHours(uidToCheck, user.getHourlyRate());
         });
     }
