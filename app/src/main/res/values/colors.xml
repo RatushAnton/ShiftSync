@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
+    <color name="medical_blue">#007AFF</color>
+    <color name="medical_dark">#0056B3</color>
+    <color name="medical_light">#E3F2FD</color>
+    <color name="alert_red">#D32F2F</color>
+    <color name="success_green">#388E3C</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+
+    <color name="purple_200">@color/medical_light</color>
+    <color name="purple_500">@color/medical_blue</color>
+    <color name="purple_700">@color/medical_dark</color>
+    <color name="teal_200">@color/medical_light</color>
+    <color name="teal_700">@color/medical_dark</color>
 </resources>

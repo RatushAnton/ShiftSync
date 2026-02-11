@@ -18,10 +18,6 @@
         <activity
             android:name=".RegisterActivity"
             android:exported="false" />
-
-        <activity android:name=".StaffActivity" />
-        <activity android:name=".PayCheckActivity" />
-
         <activity
             android:name=".LoginActivity"
             android:exported="true">
@@ -30,6 +26,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".StaffActivity" />
+        <activity android:name=".PayCheckActivity" />
 
     </application>
 

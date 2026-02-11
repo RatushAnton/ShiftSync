@@ -1,73 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF">
+    android:orientation="vertical"
+    android:background="#F5F5F5">
 
     <LinearLayout
-        android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#007AFF"
-        android:padding="20dp"
+        android:background="@color/medical_blue"
         android:orientation="vertical"
-        app:layout_constraintTop_toTopOf="parent">
+        android:padding="24dp"
+        android:paddingBottom="40dp">
 
         <TextView
             android:id="@+id/welcomeText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Hello, Doctor"
-            android:textColor="#FFFFFF"
-            android:textSize="22sp"
+            android:text="Hello, Dr. Smith"
+            android:textColor="@color/white"
+            android:textSize="24sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/quotaText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Shifts this month: 0 / 4"
-            android:textColor="#E0E0E0"
+            android:text="Monthly Quota: Loading..."
+            android:textColor="#CCFFFFFF"
             android:textSize="14sp" />
     </LinearLayout>
 
-    <com.applandeo.materialcalendarview.CalendarView
-        android:id="@+id/calendarView"
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@+id/adminPanelButton"
-        app:layout_constraintTop_toBottomOf="@+id/header"
-        app:headerColor="#F5F7FA"
-        app:headerLabelColor="#000000" />
+        android:layout_weight="1"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="-20dp"
+        android:layout_marginBottom="16dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="6dp">
 
-    <Button
-        android:id="@+id/viewPaystubBtn"
+        <com.applandeo.materialcalendarview.CalendarView
+            android:id="@+id/calendarView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:headerColor="@color/white"
+            app:headerLabelColor="@color/black"
+            app:abbreviationsBarColor="@color/white"
+            app:abbreviationsLabelsColor="@color/medical_blue"
+            app:pagesColor="@color/white"
+            app:selectionColor="@color/medical_blue"
+            app:todayLabelColor="@color/medical_dark"
+            app:type="one_day_picker" />
+
+    </androidx.cardview.widget.CardView>
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:backgroundTint="#007AFF"
-        android:text="View Paystub"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <Button
-        android:id="@+id/adminPanelButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:backgroundTint="#D32F2F"
-        android:text="Admin Panel: Generate Schedule"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent" />
+        <Button
+            android:id="@+id/viewPaystubBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="My Paystub"
+            android:backgroundTint="@color/medical_light"
+            android:textColor="@color/medical_dark"
+            app:icon="@android:drawable/ic_menu_my_calendar"
+            app:iconTint="@color/medical_dark"
+            android:layout_marginBottom="8dp"/>
 
-    <Button
-        android:id="@+id/manageStaffBtn"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Manage Staff/Salaries"
-        android:backgroundTint="#4CAF50"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@+id/adminPanelButton" />
+        <Button
+            android:id="@+id/manageStaffBtn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Manage Staff"
+            android:visibility="gone"
+            android:backgroundTint="@color/medical_dark"
+            android:textColor="@color/white"
+            android:layout_marginBottom="8dp"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <Button
+            android:id="@+id/adminPanelButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Generate Schedule"
+            android:visibility="gone"
+            android:backgroundTint="@color/alert_red"
+            android:textColor="@color/white"/>
+
+    </LinearLayout>
+
+</LinearLayout>
