@@ -74,6 +74,9 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Starting Algorithm...", Toast.LENGTH_SHORT).show();
             runShiftGenerationAlgorithm();
         });
+
+        Button payBtn = findViewById(R.id.viewPaystubBtn);
+        payBtn.setOnClickListener(v -> startActivity(new Intent(this, PayCheckActivity.class)));
     }
 
     // --- HELPER: Handle Click on Date ---
@@ -172,8 +175,22 @@ public class MainActivity extends AppCompatActivity {
                         welcomeText.setText("Hello, " + user.getFullName());
                         quotaText.setText("Target Quota: " + user.getShiftQuota());
 
-                        if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+                        // Inside loadUserData() method:
+                        if ("ADMIN".equalsIgnoreCase(user.getRole()) || "MANAGER".equalsIgnoreCase(user.getRole())) {
+                            // Show the Generate button AND the Manage Staff button
                             adminBtn.setVisibility(View.VISIBLE);
+
+                            if ("MANAGER".equalsIgnoreCase(user.getRole())) {
+                                adminBtn.setText("Manager Panel: Generate Schedule");
+                            } else {
+                                adminBtn.setText("Admin Panel: Generate Schedule");
+                            }
+
+                            Button staffBtn = findViewById(R.id.manageStaffBtn);
+                            staffBtn.setVisibility(View.VISIBLE);
+                            staffBtn.setOnClickListener(v -> {
+                                startActivity(new Intent(MainActivity.this, StaffActivity.class));
+                            });
                         }
                     }
                 })

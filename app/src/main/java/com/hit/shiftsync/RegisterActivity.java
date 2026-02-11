@@ -2,7 +2,6 @@ package com.hit.shiftsync;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -11,7 +10,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.hit.shiftsync.models.User;
+import com.hit.shiftsync.models.User; // Make sure this matches your User model package
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -77,8 +76,11 @@ public class RegisterActivity extends AppCompatActivity {
         // Logic: Anesthesiology needs 9 shifts, others need 4 (As per your brief)
         int quota = dept.equals("Anesthesiology") ? 9 : 4;
 
-        // Create the User Object
-        User newUser = new User(uid, name, email, "DOCTOR", dept, quota);
+        // Default salary is 0.0 until Admin/Manager sets it
+        double defaultSalary = 0.0;
+
+        // Create the User Object using the NEW constructor (7 arguments)
+        User newUser = new User(uid, name, email, "DOCTOR", dept, quota, defaultSalary);
 
         // Save to "users" collection
         db.collection("users").document(uid).set(newUser)
