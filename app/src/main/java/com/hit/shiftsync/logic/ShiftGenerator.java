@@ -40,9 +40,10 @@ public class ShiftGenerator {
             List<User> availableForWork = new ArrayList<>();
 
             for (User doc : allDoctors) {
+                // Rule 0: GOD MODE - Admins do not work shifts.
+                if ("ADMIN".equalsIgnoreCase(doc.getRole())) continue;
                 // Constraint A: Did they request this day off?
                 if (isBlocked(doc, dateString, blockedDays)) continue;
-
                 // Constraint B: Did they start a LONG shift yesterday? (Recovery Day)
                 if (workedLongShiftYesterday(doc, cal, roster)) continue;
 

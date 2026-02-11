@@ -43,6 +43,15 @@
         app:headerLabelColor="#000000" />
 
     <Button
+        android:id="@+id/viewPaystubBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:backgroundTint="#007AFF"
+        android:text="View Paystub"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <Button
         android:id="@+id/adminPanelButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -51,5 +60,14 @@
         android:text="Admin Panel: Generate Schedule"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent" />
+
+    <Button
+        android:id="@+id/manageStaffBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Manage Staff/Salaries"
+        android:backgroundTint="#4CAF50"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/adminPanelButton" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,27 +1,27 @@
 package com.hit.shiftsync.models;
 
 public class User {
-    private String uid;          // The unique ID from Firebase Auth
-    private String fullName;     // e.g., "Dr. Yossi Cohen"
+    private String uid;
+    private String fullName;
     private String email;
-    private String role;         // "ADMIN" or "DOCTOR"
-    private String department;   // e.g., "Internal", "Anesthesiology"
-    private int shiftQuota;      // How many shifts they MUST do (e.g., 9)
+    private String role;         // "ADMIN", "MANAGER", "DOCTOR"
+    private String department;
+    private int shiftQuota;
+    private double hourlyRate;   // NEW: For Paystubs (e.g., 50.0)
 
-    // Empty constructor is REQUIRED for Firestore!
-    // If you don't have this, the app will crash when reading data.
     public User() { }
 
-    public User(String uid, String fullName, String email, String role, String department, int shiftQuota) {
+    public User(String uid, String fullName, String email, String role, String department, int shiftQuota, double hourlyRate) {
         this.uid = uid;
         this.fullName = fullName;
         this.email = email;
         this.role = role;
         this.department = department;
         this.shiftQuota = shiftQuota;
+        this.hourlyRate = hourlyRate;
     }
 
-    // Getters and Setters (You can generate these by Right Click -> Generate -> Getter and Setter)
+    // Getters and Setters
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }
 
@@ -39,4 +39,7 @@ public class User {
 
     public int getShiftQuota() { return shiftQuota; }
     public void setShiftQuota(int shiftQuota) { this.shiftQuota = shiftQuota; }
+
+    public double getHourlyRate() { return hourlyRate; }
+    public void setHourlyRate(double hourlyRate) { this.hourlyRate = hourlyRate; }
 }
