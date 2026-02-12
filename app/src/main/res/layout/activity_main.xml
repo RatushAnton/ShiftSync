@@ -51,10 +51,10 @@
             app:abbreviationsBarColor="@color/white"
             app:abbreviationsLabelsColor="@color/medical_blue"
             app:pagesColor="@color/white"
+            app:type="one_day_picker"
+            app:eventsEnabled="true"
             app:selectionColor="@color/medical_blue"
-            app:todayLabelColor="@color/medical_dark"
-            app:type="one_day_picker" />
-
+            app:todayLabelColor="@color/medical_dark" />
     </androidx.cardview.widget.CardView>
 
     <LinearLayout

@@ -12,68 +12,80 @@ import java.util.UUID;
 
 /**
  * ShiftGenerator
- * * Implements a heuristic scheduling algorithm to assign shifts to doctors.
- * Goal: Minimize quota deficit (Greedy approach) while respecting constraints.
+ * ------------------------------------------------------------------
+ * Logic Component that handles the automatic scheduling of shifts.
+ * * ALGORITHM APPROACH: "Greedy Heuristic"
+ * 1. Iterates through every day of the month.
+ * 2. Identifies the 3 necessary shifts (Morning, Evening, Night).
+ * 3. Selects the "Best Candidate" for each slot based on:
+ * - Constraints (Is the doctor available?)
+ * - Quota Deficit (Who is furthest from their monthly target?)
+ * ------------------------------------------------------------------
  */
 public class ShiftGenerator {
 
     /**
-     * Generates a roster for a specific month.
-     * @param doctors List of available staff
-     * @param year Target year
-     * @param month Target month (0-11)
-     * @param blockedDays Map of UserID -> List of blocked dates (Strings)
-     * @return List of generated Shift objects
+     * Generates a full monthly roster.
+     * @param doctors List of all users with role 'DOCTOR'
+     * @param year The target year (e.g., 2026)
+     * @param month The target month (0-11)
+     * @param blockedDays Map of UserID -> List of dates they cannot work
+     * @return A list of Shift objects ready to be saved to Firestore
      */
     public List<Shift> generateMonthlyRoster(List<User> doctors, int year, int month, Map<String, List<String>> blockedDays) {
         List<Shift> roster = new ArrayList<>();
 
-        // Track how many shifts each doctor has been assigned so far
+        // Step 1: Initialize a counter to track assigned shifts per doctor
         Map<String, Integer> currentShiftCounts = new HashMap<>();
         for (User doc : doctors) {
             currentShiftCounts.put(doc.getUid(), 0);
         }
 
+        // Step 2: Determine how many days are in the target month
         Calendar cal = Calendar.getInstance();
         cal.set(year, month, 1);
         int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
 
-        // Loop through every day of the month
+        // Step 3: Iterate through every day of the month
         for (int day = 1; day <= daysInMonth; day++) {
             String dateString = String.format("%d-%02d-%02d", year, month + 1, day);
 
-            // Generate 3 shifts per day (Morning, Evening, Night)
+            // We need 3 shifts per day: 0=Morning, 1=Evening, 2=Night
             for (int shiftType = 0; shiftType < 3; shiftType++) {
-                String type = getShiftType(shiftType); // MORNING, EVENING, NIGHT
+                String type = getShiftType(shiftType);
 
                 User bestCandidate = null;
                 int maxDeficit = Integer.MIN_VALUE;
 
-                // GREEDY SELECTION: Find the doctor who needs shifts the most
+                // --- GREEDY SELECTION START ---
+                // Find the doctor who needs this shift the most
                 for (User doc : doctors) {
-                    // 1. Check if doctor is blocked on this day
+
+                    // Constraint Check: Is the doctor blocked on this specific date?
                     if (isBlocked(doc.getUid(), dateString, blockedDays)) {
-                        continue;
+                        continue; // Skip this doctor
                     }
 
-                    // 2. Calculate "Need" (Quota - Current Assigned)
+                    // Heuristic: Calculate "Deficit" (Target Quota - Already Assigned)
+                    // The higher the deficit, the more they need the shift.
                     int currentAssigned = currentShiftCounts.get(doc.getUid());
                     int deficit = doc.getShiftQuota() - currentAssigned;
 
-                    // 3. Pick the one with the highest deficit
+                    // If this doctor has a higher need than our current best candidate, pick them
                     if (deficit > maxDeficit) {
                         maxDeficit = deficit;
                         bestCandidate = doc;
                     }
                 }
+                // --- GREEDY SELECTION END ---
 
-                // If a candidate was found, assign the shift
+                // If we found a valid doctor, create the shift
                 if (bestCandidate != null) {
                     long startTime = getShiftTime(year, month, day, shiftType);
-                    long endTime = startTime + (8 * 60 * 60 * 1000); // 8 hours later
+                    long endTime = startTime + (8 * 60 * 60 * 1000); // Standard 8-hour duration
 
                     Shift shift = new Shift(
-                            UUID.randomUUID().toString(),
+                            UUID.randomUUID().toString(), // Generate unique ID
                             bestCandidate.getUid(),
                             bestCandidate.getFullName(),
                             startTime,
@@ -82,7 +94,7 @@ public class ShiftGenerator {
                     );
                     roster.add(shift);
 
-                    // Update their count
+                    // Increment their shift count so the algorithm knows for next time
                     currentShiftCounts.put(bestCandidate.getUid(), currentShiftCounts.get(bestCandidate.getUid()) + 1);
                 }
             }
@@ -90,11 +102,13 @@ public class ShiftGenerator {
         return roster;
     }
 
+    // Helper: Checks if a specific doctor has blocked a specific date
     private boolean isBlocked(String uid, String date, Map<String, List<String>> blockedDays) {
         if (blockedDays == null || !blockedDays.containsKey(uid)) return false;
         return blockedDays.get(uid).contains(date);
     }
 
+    // Helper: Converts index to readable Shift Type
     private String getShiftType(int i) {
         switch (i) {
             case 0: return "MORNING";
@@ -103,12 +117,13 @@ public class ShiftGenerator {
         }
     }
 
+    // Helper: Creates a Timestamp for the shift start
     private long getShiftTime(int year, int month, int day, int type) {
         Calendar c = Calendar.getInstance();
         c.set(year, month, day);
-        if (type == 0) c.set(Calendar.HOUR_OF_DAY, 8);  // 08:00
-        else if (type == 1) c.set(Calendar.HOUR_OF_DAY, 16); // 16:00
-        else c.set(Calendar.HOUR_OF_DAY, 23); // 23:00
+        if (type == 0) c.set(Calendar.HOUR_OF_DAY, 8);  // 08:00 start
+        else if (type == 1) c.set(Calendar.HOUR_OF_DAY, 16); // 16:00 start
+        else c.set(Calendar.HOUR_OF_DAY, 23); // 23:00 start
 
         c.set(Calendar.MINUTE, 0);
         return c.getTimeInMillis();

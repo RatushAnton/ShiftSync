@@ -9,7 +9,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-// Using Applandeo Material Calendar View for the shift display
+// Using Applandeo Material Calendar View for the visual schedule
 import com.applandeo.materialcalendarview.CalendarView;
 import com.applandeo.materialcalendarview.EventDay;
 import com.hit.shiftsync.logic.ShiftGenerator;
@@ -27,94 +27,97 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * MainActivity: The core dashboard of the application.
- * Handles displaying the calendar, loading user shifts, and providing access
- * to Manager/Admin tools based on user roles.
+ * MainActivity
+ * ------------------------------------------------------------------
+ * The central dashboard of the application.
+ * Responsibilities:
+ * 1. Authenticate User (Redirect to Login if null).
+ * 2. Load User Profile & Role (Doctor vs Manager/Admin).
+ * 3. Display Calendar with visually coded shifts (Dots).
+ * 4. Provide navigation to sub-features (Paystubs, Manager Panel).
+ * ------------------------------------------------------------------
  */
 public class MainActivity extends AppCompatActivity {
 
+    // Firebase Components
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
 
+    // UI Components
     private TextView welcomeText, quotaText;
     private Button adminBtn;
     private CalendarView calendarView;
-    private User currentUserData; // Stores the profile of the logged-in user
+
+    private User currentUserData; // Cached user profile for permission checks
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize Firebase instances
+        // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
-        // 1. Security Check: Redirect to Login if no user is signed in
+        // Security Check: Ensure user is logged in
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
             startActivity(new Intent(this, LoginActivity.class));
-            finish();
+            finish(); // Prevent back-navigation
             return;
         }
 
-        // 2. Initialize UI Components
+        // Bind UI Elements
         welcomeText = findViewById(R.id.welcomeText);
         quotaText = findViewById(R.id.quotaText);
         adminBtn = findViewById(R.id.adminPanelButton);
         calendarView = findViewById(R.id.calendarView);
 
-        // 3. Load Data from Firestore
+        // Load Data
         loadUserData(currentUser.getUid());
         loadShiftsToCalendar();
 
-        // 4. Set up Calendar Interaction
-        // When a user clicks a day, we check if there is a shift or allow them to request time off
+        // Calendar Interaction: Handle click on specific days
         calendarView.setOnDayClickListener(eventDay -> {
             Calendar clickedDayCalendar = eventDay.getCalendar();
             checkForShiftDetails(clickedDayCalendar);
         });
 
-        // 5. Admin/Manager Button Logic
-        // Triggers the scheduling algorithm
+        // Admin/Manager Logic: Trigger the Algorithm
         adminBtn.setOnClickListener(v -> {
             adminBtn.setEnabled(false);
             adminBtn.setText("Generating...");
-            Toast.makeText(this, "Starting Algorithm...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Starting Scheduling Algorithm...", Toast.LENGTH_SHORT).show();
             runShiftGenerationAlgorithm();
         });
 
-        // Paystub Navigation
+        // Navigation: Paystub
         Button payBtn = findViewById(R.id.viewPaystubBtn);
         payBtn.setOnClickListener(v -> startActivity(new Intent(this, PayCheckActivity.class)));
     }
 
     /**
-     * Checks if a shift exists on the clicked date.
-     * If YES -> Show details (and delete option for managers).
-     * If NO -> Ask if the user wants to mark it as UNAVAILABLE.
+     * Logic to determine what happens when a day is clicked.
+     * - If Shift Exists: Show Details (and Delete option for Managers).
+     * - If Empty: Allow user to Request Day Off (Constraint).
      */
     private void checkForShiftDetails(Calendar clickedDate) {
         String myUid = mAuth.getCurrentUser().getUid();
 
-        // Normalize time to 00:00:00 to ensure accurate date comparison
+        // Normalize clicked date to Midnight for accurate comparison
         Calendar queryDate = (Calendar) clickedDate.clone();
-        queryDate.set(Calendar.HOUR_OF_DAY, 0);
-        queryDate.set(Calendar.MINUTE, 0);
-        queryDate.set(Calendar.SECOND, 0);
-        queryDate.set(Calendar.MILLISECOND, 0);
+        setMidnight(queryDate);
 
         long targetDayStart = queryDate.getTimeInMillis();
-        long targetDayEnd = targetDayStart + (24 * 60 * 60 * 1000); // End of the day
+        long targetDayEnd = targetDayStart + (24 * 60 * 60 * 1000);
 
-        // Query Firestore for my shifts
         db.collection("shifts")
                 .whereEqualTo("userId", myUid)
                 .get()
                 .addOnSuccessListener(snapshots -> {
                     Shift foundShift = null;
 
-                    // Filter client-side for the specific day
+                    // Filter results to find shift on this specific day
                     for (QueryDocumentSnapshot doc : snapshots) {
                         Shift s = doc.toObject(Shift.class);
                         if (s.getStartTime() >= targetDayStart && s.getStartTime() < targetDayEnd) {
@@ -124,10 +127,9 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     if (foundShift != null) {
-                        // Shift Found: Show Dialog
                         showShiftDetailsDialog(foundShift);
                     } else {
-                        // No Shift: Allow "Request Off"
+                        // Format date for the dialog message
                         String dateString = String.format("%d-%02d-%02d",
                                 queryDate.get(Calendar.YEAR),
                                 queryDate.get(Calendar.MONTH) + 1,
@@ -135,11 +137,10 @@ public class MainActivity extends AppCompatActivity {
                         showRequestDialog(dateString);
                     }
                 })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Error fetching data", Toast.LENGTH_SHORT).show();
-                });
+                .addOnFailureListener(e -> Toast.makeText(this, "Error fetching data", Toast.LENGTH_SHORT).show());
     }
 
+    // Displays shift info. Managers get a "DELETE" button.
     private void showShiftDetailsDialog(Shift foundShift) {
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm");
         String startStr = sdf.format(new java.util.Date(foundShift.getStartTime()));
@@ -147,12 +148,12 @@ public class MainActivity extends AppCompatActivity {
 
         androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Shift Details")
-                .setMessage("Type: " + foundShift.getType() +
+                .setMessage("Shift Type: " + foundShift.getType() +
                         "\nStart: " + startStr +
                         "\nEnd: " + endStr)
                 .setPositiveButton("OK", null);
 
-        // MANAGER FEATURE: Delete Shift
+        // RBAC (Role Based Access Control): Only Managers/Admins can delete
         if (currentUserData != null &&
                 ("ADMIN".equalsIgnoreCase(currentUserData.getRole()) ||
                         "MANAGER".equalsIgnoreCase(currentUserData.getRole()))) {
@@ -172,23 +173,23 @@ public class MainActivity extends AppCompatActivity {
                     db.collection("shifts").document(shift.getShiftId()).delete()
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "Shift Deleted", Toast.LENGTH_SHORT).show();
-                                loadShiftsToCalendar(); // Refresh UI
+                                loadShiftsToCalendar(); // Refresh UI to remove dot
                             });
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
+    // Allows users to mark a day as "UNAVAILABLE"
     private void showRequestDialog(String date) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Request Day Off")
-                .setMessage("Mark " + date + " as UNAVAILABLE?")
-                .setPositiveButton("Yes", (dialog, which) -> saveConstraint(date))
+                .setMessage("Mark " + date + " as UNAVAILABLE for future scheduling?")
+                .setPositiveButton("Yes, Block Date", (dialog, which) -> saveConstraint(date))
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    // Saves a constraint (Unavailable Day) to Firestore
     private void saveConstraint(String date) {
         FirebaseUser user = mAuth.getCurrentUser();
         if (user == null) return;
@@ -199,14 +200,14 @@ public class MainActivity extends AppCompatActivity {
         constraint.put("date", date);
         constraint.put("type", "UNAVAILABLE");
 
-        // Use composite key (UserID + Date) to prevent duplicates
+        // Composite Key (Uid + Date) prevents duplicate entries
         String docId = user.getUid() + "_" + date;
 
         db.collection("constraints").document(docId).set(constraint)
                 .addOnSuccessListener(aVoid -> Toast.makeText(this, "Day blocked!", Toast.LENGTH_SHORT).show());
     }
 
-    // Loads user profile and updates UI based on Role
+    // Fetch User Profile to determine Role and Name
     private void loadUserData(String uid) {
         db.collection("users").document(uid).get()
                 .addOnSuccessListener(documentSnapshot -> {
@@ -217,11 +218,11 @@ public class MainActivity extends AppCompatActivity {
                         welcomeText.setText("Hello, " + user.getFullName());
                         quotaText.setText("Target Quota: " + user.getShiftQuota());
 
-                        // Show Admin/Manager controls if applicable
+                        // Reveal Admin buttons if role matches
                         if ("ADMIN".equalsIgnoreCase(user.getRole()) || "MANAGER".equalsIgnoreCase(user.getRole())) {
                             adminBtn.setVisibility(View.VISIBLE);
                             adminBtn.setText("MANAGER".equalsIgnoreCase(user.getRole()) ?
-                                    "Manager Panel: Generate" : "Admin Panel: Generate");
+                                    "Manager Panel: Generate Schedule" : "Admin Panel: Generate Schedule");
 
                             Button staffBtn = findViewById(R.id.manageStaffBtn);
                             staffBtn.setVisibility(View.VISIBLE);
@@ -231,16 +232,16 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    // Runs the Scheduling Algorithm
+    // --- ALGORITHM EXECUTION ---
     private void runShiftGenerationAlgorithm() {
-        // 1. Fetch All Doctors
+        // 1. Fetch Doctors
         db.collection("users").get().addOnSuccessListener(userSnapshots -> {
             List<User> allDoctors = new ArrayList<>();
             for (QueryDocumentSnapshot doc : userSnapshots) {
                 allDoctors.add(doc.toObject(User.class));
             }
 
-            // 2. Fetch All Constraints (Blocked Days)
+            // 2. Fetch Constraints
             db.collection("constraints").get().addOnSuccessListener(constraintSnapshots -> {
                 Map<String, List<String>> blockedMap = new HashMap<>();
                 for (QueryDocumentSnapshot doc : constraintSnapshots) {
@@ -250,7 +251,7 @@ public class MainActivity extends AppCompatActivity {
                     blockedMap.get(uid).add(date);
                 }
 
-                // 3. Execute Algorithm
+                // 3. Run Logic
                 ShiftGenerator generator = new ShiftGenerator();
                 Calendar now = Calendar.getInstance();
                 List<Shift> newRoster = generator.generateMonthlyRoster(
@@ -260,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
                         blockedMap
                 );
 
-                // 4. Save Results
+                // 4. Save
                 saveRosterToFirebase(newRoster);
             });
         });
@@ -278,90 +279,81 @@ public class MainActivity extends AppCompatActivity {
         batch.commit().addOnSuccessListener(aVoid -> {
             Toast.makeText(this, "Schedule Generated Successfully", Toast.LENGTH_LONG).show();
             adminBtn.setEnabled(true);
-            loadShiftsToCalendar();
+            loadShiftsToCalendar(); // Refresh UI
         });
     }
 
     /**
-     * Loads shifts from Firestore and displays them as Blue Dots on the calendar.
-     */
-    /**
-     * Loads shifts and applies Smart Color Logic:
-     * - Past Days: No Dot
-     * - Today: Blue Dot
-     * - Regular Shift (8h): Green Dot
-     * - Half Shift (<8h): Yellow Dot
-     * - Long Shift (>8h): Red Dot
+     * Loads shifts from Firestore and visualizes them on the Calendar.
+     * Uses Color Coding:
+     * - Blue: Today (Default)
+     * - Green: Regular Shift
+     * - Yellow: Short Shift
+     * - Red: Long Shift
      */
     private void loadShiftsToCalendar() {
         db.collection("shifts").get().addOnSuccessListener(snapshots -> {
-            List<com.applandeo.materialcalendarview.EventDay> events = new ArrayList<>();
+            // Map ensures we don't have duplicate events on the same day (Shift overrides Today)
+            Map<String, com.applandeo.materialcalendarview.EventDay> eventsMap = new HashMap<>();
             String myUid = mAuth.getCurrentUser().getUid();
 
-            // 1. Get Today's Date (at midnight) for comparison
+            // 1. Set Default "Today" Indicator
             Calendar today = Calendar.getInstance();
-            today.set(Calendar.HOUR_OF_DAY, 0);
-            today.set(Calendar.MINUTE, 0);
-            today.set(Calendar.SECOND, 0);
-            today.set(Calendar.MILLISECOND, 0);
+            setMidnight(today);
+            String todayKey = formatDate(today);
+            eventsMap.put(todayKey, new com.applandeo.materialcalendarview.EventDay(today, R.drawable.ic_circle_blue));
 
-            // 2. Add Blue Dot for TODAY (Current Day)
-            // Note: We clone 'today' because EventDay holds a reference to the calendar object
-            Calendar todayEvent = (Calendar) today.clone();
-            events.add(new com.applandeo.materialcalendarview.EventDay(todayEvent, R.drawable.ic_circle_blue));
-
+            // 2. Process Shifts
             for (com.google.firebase.firestore.QueryDocumentSnapshot doc : snapshots) {
                 Shift shift = doc.toObject(Shift.class);
 
-                // Filter: Only show MY shifts
                 if (shift.getUserId().equals(myUid)) {
-                    Calendar shiftDate = Calendar.getInstance();
-                    shiftDate.setTimeInMillis(shift.getStartTime());
+                    Calendar shiftCal = Calendar.getInstance();
+                    shiftCal.setTimeInMillis(shift.getStartTime());
+                    setMidnight(shiftCal); // Normalize to Midnight for library compatibility
 
-                    // LOGIC: "For days before today - don't mark any dots"
-                    // We compare the shift date (normalized to midnight) with 'today'
-                    Calendar checkDate = (Calendar) shiftDate.clone();
-                    checkDate.set(Calendar.HOUR_OF_DAY, 0);
-                    checkDate.set(Calendar.MINUTE, 0);
-                    checkDate.set(Calendar.SECOND, 0);
-                    checkDate.set(Calendar.MILLISECOND, 0);
-
-                    if (checkDate.before(today)) {
-                        continue; // Skip past shifts
+                    // Do not show dots for past days
+                    if (shiftCal.before(today)) {
+                        continue;
                     }
 
-                    // LOGIC: Determine Dot Color based on Duration
+                    // Calculate Duration to pick color
                     long durationMillis = shift.getEndTime() - shift.getStartTime();
                     double durationHours = durationMillis / (1000.0 * 60 * 60);
 
                     int dotDrawable;
                     if (durationHours > 8.5) {
-                        // Long shift (> 8.5 hours) -> Red
                         dotDrawable = R.drawable.ic_dot_red;
                     } else if (durationHours < 7.5) {
-                        // Half/Short shift (< 7.5 hours) -> Yellow
                         dotDrawable = R.drawable.ic_dot_yellow;
                     } else {
-                        // Regular shift (approx 8 hours) -> Green
                         dotDrawable = R.drawable.ic_dot_green;
                     }
 
-                    // Add the colored dot
-                    events.add(new com.applandeo.materialcalendarview.EventDay(shiftDate, dotDrawable));
+                    String shiftKey = formatDate(shiftCal);
+                    // This put() overrides the blue dot if a shift exists today
+                    eventsMap.put(shiftKey, new com.applandeo.materialcalendarview.EventDay(shiftCal, dotDrawable));
                 }
             }
 
-            // 3. Update the Calendar View on the main thread
+            // 3. Update UI Thread
             runOnUiThread(() -> {
-                calendarView.setEvents(events);
-
-                // Optional: Scroll to today so the user sees the blue dot immediately
-                try {
-                    calendarView.setDate(today);
-                } catch (com.applandeo.materialcalendarview.exceptions.OutOfDateRangeException e) {
-                    e.printStackTrace();
-                }
+                List<com.applandeo.materialcalendarview.EventDay> finalEvents = new ArrayList<>(eventsMap.values());
+                calendarView.setEvents(finalEvents);
             });
         });
+    }
+
+    // Helper: Resets Calendar time to 00:00:00 for accurate day comparison
+    private void setMidnight(Calendar cal) {
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+    }
+
+    // Helper: Generates unique key for Map based on date
+    private String formatDate(Calendar cal) {
+        return cal.get(Calendar.YEAR) + "-" + cal.get(Calendar.MONTH) + "-" + cal.get(Calendar.DAY_OF_MONTH);
     }
 }
