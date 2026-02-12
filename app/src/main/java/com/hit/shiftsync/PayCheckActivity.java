@@ -14,6 +14,11 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.Calendar;
 
+/**
+ * PayCheckActivity
+ * * Displays the monthly paystub for a user.
+ * Can be viewed by the Doctor (for themselves) or a Manager (for a specific doctor).
+ */
 public class PayCheckActivity extends AppCompatActivity {
 
     private TextView periodText, hoursText, rateText, payText;
@@ -37,36 +42,31 @@ public class PayCheckActivity extends AppCompatActivity {
     }
 
     private void loadPayData() {
-        // 1. Check if we passed a specific user ID (From Manager Screen)
+        // Feature: Managers can pass a User ID to view THAT user's paystub
         String targetUid = getIntent().getStringExtra("TARGET_USER_ID");
         String targetName = getIntent().getStringExtra("TARGET_USER_NAME");
 
-        // If targetUid is null, it means I am a doctor looking at my own paystub
+        // If no target passed, default to current logged-in user
         String uidToCheck = (targetUid != null) ? targetUid : mAuth.getCurrentUser().getUid();
 
-        // Optional: Update Title
         if (targetName != null) {
-            // If you have a title TextView, you can update it here
-            TextView header = findViewById(R.id.payPeriodText);
-            // header.setText("Paystub for " + targetName);
+            getSupportActionBar().setTitle("Paystub: " + targetName);
         }
 
-        // 2. Fetch User Data
+        // 1. Get User Profile (to find Hourly Rate)
         db.collection("users").document(uidToCheck).get().addOnSuccessListener(userSnap -> {
             User user = userSnap.toObject(User.class);
-            if (user == null) {
-                Toast.makeText(this, "User data not found", Toast.LENGTH_SHORT).show();
-                return;
-            }
+            if (user == null) return;
 
             rateText.setText("Hourly Rate: $" + user.getHourlyRate());
 
-            // 3. Calculate Shifts for THIS Month
+            // 2. Calculate Shifts for THIS Month
             calculateMonthlyHours(uidToCheck, user.getHourlyRate());
         });
     }
 
     private void calculateMonthlyHours(String uid, double rate) {
+        // Determine start/end of current month
         Calendar start = Calendar.getInstance();
         start.set(Calendar.DAY_OF_MONTH, 1);
         start.set(Calendar.HOUR_OF_DAY, 0);
@@ -76,10 +76,11 @@ public class PayCheckActivity extends AppCompatActivity {
         end.set(Calendar.DAY_OF_MONTH, 1);
         end.set(Calendar.HOUR_OF_DAY, 0);
 
-        // UI Update
+        // Update UI Header
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMMM yyyy");
         periodText.setText("Period: " + sdf.format(start.getTime()));
 
+        // Query shifts within this time range
         db.collection("shifts")
                 .whereEqualTo("userId", uid)
                 .whereGreaterThanOrEqualTo("startTime", start.getTimeInMillis())
@@ -91,7 +92,7 @@ public class PayCheckActivity extends AppCompatActivity {
                     for (QueryDocumentSnapshot doc : snapshots) {
                         Shift shift = doc.toObject(Shift.class);
                         long diff = shift.getEndTime() - shift.getStartTime();
-                        // Convert millis to hours
+                        // Convert Millis -> Hours
                         double hours = diff / (1000.0 * 60 * 60);
                         totalHours += hours;
                     }
@@ -99,6 +100,7 @@ public class PayCheckActivity extends AppCompatActivity {
                     // Update UI
                     hoursText.setText(String.format("Total Hours: %.1f", totalHours));
 
+                    // Gross Pay = Hours * Rate
                     double grossPay = totalHours * rate;
                     payText.setText(String.format("Estimated Pay: $%.2f", grossPay));
                 })
