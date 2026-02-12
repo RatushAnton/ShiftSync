@@ -285,25 +285,83 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Loads shifts from Firestore and displays them as Blue Dots on the calendar.
      */
+    /**
+     * Loads shifts and applies Smart Color Logic:
+     * - Past Days: No Dot
+     * - Today: Blue Dot
+     * - Regular Shift (8h): Green Dot
+     * - Half Shift (<8h): Yellow Dot
+     * - Long Shift (>8h): Red Dot
+     */
     private void loadShiftsToCalendar() {
         db.collection("shifts").get().addOnSuccessListener(snapshots -> {
-            List<EventDay> events = new ArrayList<>();
+            List<com.applandeo.materialcalendarview.EventDay> events = new ArrayList<>();
             String myUid = mAuth.getCurrentUser().getUid();
 
-            for (QueryDocumentSnapshot doc : snapshots) {
+            // 1. Get Today's Date (at midnight) for comparison
+            Calendar today = Calendar.getInstance();
+            today.set(Calendar.HOUR_OF_DAY, 0);
+            today.set(Calendar.MINUTE, 0);
+            today.set(Calendar.SECOND, 0);
+            today.set(Calendar.MILLISECOND, 0);
+
+            // 2. Add Blue Dot for TODAY (Current Day)
+            // Note: We clone 'today' because EventDay holds a reference to the calendar object
+            Calendar todayEvent = (Calendar) today.clone();
+            events.add(new com.applandeo.materialcalendarview.EventDay(todayEvent, R.drawable.ic_circle_blue));
+
+            for (com.google.firebase.firestore.QueryDocumentSnapshot doc : snapshots) {
                 Shift shift = doc.toObject(Shift.class);
 
                 // Filter: Only show MY shifts
                 if (shift.getUserId().equals(myUid)) {
-                    Calendar calendar = Calendar.getInstance();
-                    calendar.setTimeInMillis(shift.getStartTime());
+                    Calendar shiftDate = Calendar.getInstance();
+                    shiftDate.setTimeInMillis(shift.getStartTime());
 
-                    // Add Blue Dot
-                    events.add(new EventDay(calendar, R.drawable.ic_circle_blue));
+                    // LOGIC: "For days before today - don't mark any dots"
+                    // We compare the shift date (normalized to midnight) with 'today'
+                    Calendar checkDate = (Calendar) shiftDate.clone();
+                    checkDate.set(Calendar.HOUR_OF_DAY, 0);
+                    checkDate.set(Calendar.MINUTE, 0);
+                    checkDate.set(Calendar.SECOND, 0);
+                    checkDate.set(Calendar.MILLISECOND, 0);
+
+                    if (checkDate.before(today)) {
+                        continue; // Skip past shifts
+                    }
+
+                    // LOGIC: Determine Dot Color based on Duration
+                    long durationMillis = shift.getEndTime() - shift.getStartTime();
+                    double durationHours = durationMillis / (1000.0 * 60 * 60);
+
+                    int dotDrawable;
+                    if (durationHours > 8.5) {
+                        // Long shift (> 8.5 hours) -> Red
+                        dotDrawable = R.drawable.ic_dot_red;
+                    } else if (durationHours < 7.5) {
+                        // Half/Short shift (< 7.5 hours) -> Yellow
+                        dotDrawable = R.drawable.ic_dot_yellow;
+                    } else {
+                        // Regular shift (approx 8 hours) -> Green
+                        dotDrawable = R.drawable.ic_dot_green;
+                    }
+
+                    // Add the colored dot
+                    events.add(new com.applandeo.materialcalendarview.EventDay(shiftDate, dotDrawable));
                 }
             }
 
-            runOnUiThread(() -> calendarView.setEvents(events));
+            // 3. Update the Calendar View on the main thread
+            runOnUiThread(() -> {
+                calendarView.setEvents(events);
+
+                // Optional: Scroll to today so the user sees the blue dot immediately
+                try {
+                    calendarView.setDate(today);
+                } catch (com.applandeo.materialcalendarview.exceptions.OutOfDateRangeException e) {
+                    e.printStackTrace();
+                }
+            });
         });
     }
 }
