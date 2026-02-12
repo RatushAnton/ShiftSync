@@ -9,9 +9,9 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-// --- IMPORTS ---
+// --- CORRECT IMPORTS ---
 import com.applandeo.materialcalendarview.CalendarView;
-import com.applandeo.materialcalendarview.CalendarDay;
+import com.applandeo.materialcalendarview.EventDay; // We use EventDay for dots
 import com.hit.shiftsync.logic.ShiftGenerator;
 import com.hit.shiftsync.models.Shift;
 import com.hit.shiftsync.models.User;
@@ -34,8 +34,6 @@ public class MainActivity extends AppCompatActivity {
     private TextView welcomeText, quotaText;
     private Button adminBtn;
     private CalendarView calendarView;
-
-    // --- NEW: Store the current user so we can check roles later ---
     private User currentUserData;
 
     @Override
@@ -46,7 +44,6 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
 
-        // 1. Check Login Status
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
             startActivity(new Intent(this, LoginActivity.class));
@@ -54,24 +51,20 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // 2. Bind UI Elements
         welcomeText = findViewById(R.id.welcomeText);
         quotaText = findViewById(R.id.quotaText);
         adminBtn = findViewById(R.id.adminPanelButton);
         calendarView = findViewById(R.id.calendarView);
 
-        // 3. Load Data
         loadUserData(currentUser.getUid());
         loadShiftsToCalendar();
 
-        // 4. Calendar Click Listener
+        // Fix: The listener now receives an EventDay
         calendarView.setOnDayClickListener(eventDay -> {
-            // The library now passes a 'CalendarDay' object
             Calendar clickedDayCalendar = eventDay.getCalendar();
             checkForShiftDetails(clickedDayCalendar);
         });
 
-        // 5. Admin Button Listener
         adminBtn.setOnClickListener(v -> {
             adminBtn.setEnabled(false);
             adminBtn.setText("Generating...");
@@ -83,11 +76,9 @@ public class MainActivity extends AppCompatActivity {
         payBtn.setOnClickListener(v -> startActivity(new Intent(this, PayCheckActivity.class)));
     }
 
-    // --- HELPER: Handle Click on Date ---
     private void checkForShiftDetails(Calendar clickedDate) {
         String myUid = mAuth.getCurrentUser().getUid();
 
-        // 1. Normalize the clicked date to Midnight (Start of the day)
         Calendar queryDate = (Calendar) clickedDate.clone();
         queryDate.set(Calendar.HOUR_OF_DAY, 0);
         queryDate.set(Calendar.MINUTE, 0);
@@ -95,27 +86,23 @@ public class MainActivity extends AppCompatActivity {
         queryDate.set(Calendar.MILLISECOND, 0);
 
         long targetDayStart = queryDate.getTimeInMillis();
-        long targetDayEnd = targetDayStart + (24 * 60 * 60 * 1000); // 24 hours later
+        long targetDayEnd = targetDayStart + (24 * 60 * 60 * 1000);
 
-        // 2. SIMPLER QUERY: Get ALL my shifts
         db.collection("shifts")
                 .whereEqualTo("userId", myUid)
                 .get()
                 .addOnSuccessListener(snapshots -> {
                     Shift foundShift = null;
 
-                    // 3. Filter in Java (Client Side)
                     for (QueryDocumentSnapshot doc : snapshots) {
                         Shift s = doc.toObject(Shift.class);
                         if (s.getStartTime() >= targetDayStart && s.getStartTime() < targetDayEnd) {
                             foundShift = s;
-                            break; // Found it! Stop looking.
+                            break;
                         }
                     }
 
-                    // 4. Show the appropriate dialog
                     if (foundShift != null) {
-                        // Found a shift! Show details.
                         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("HH:mm");
                         String startStr = sdf.format(new java.util.Date(foundShift.getStartTime()));
                         String endStr = sdf.format(new java.util.Date(foundShift.getEndTime()));
@@ -127,24 +114,19 @@ public class MainActivity extends AppCompatActivity {
                                         "\nEnd: " + endStr)
                                 .setPositiveButton("OK", null);
 
-                        // --- NEW: DELETE BUTTON LOGIC ---
-                        // Only Admins or Managers can delete shifts
                         if (currentUserData != null &&
                                 ("ADMIN".equalsIgnoreCase(currentUserData.getRole()) ||
                                         "MANAGER".equalsIgnoreCase(currentUserData.getRole()))) {
 
-                            // We need to capture the shift in a final variable or helper
                             Shift shiftToDelete = foundShift;
                             builder.setNegativeButton("DELETE SHIFT", (dialog, which) -> {
                                 confirmDeleteShift(shiftToDelete);
                             });
                         }
-                        // --------------------------------
 
                         builder.show();
 
                     } else {
-                        // No shift found -> Ask to Request Day Off
                         String dateString = String.format("%d-%02d-%02d",
                                 queryDate.get(Calendar.YEAR),
                                 queryDate.get(Calendar.MONTH) + 1,
@@ -158,7 +140,6 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    // --- NEW HELPER: Delete Shift ---
     private void confirmDeleteShift(Shift shift) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Confirm Delete")
@@ -168,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
                     db.collection("shifts").document(shift.getShiftId()).delete()
                             .addOnSuccessListener(aVoid -> {
                                 Toast.makeText(this, "Shift Deleted", Toast.LENGTH_SHORT).show();
-                                loadShiftsToCalendar(); // Refresh the blue dots
+                                loadShiftsToCalendar();
                             })
                             .addOnFailureListener(e -> Toast.makeText(this, "Error deleting: " + e.getMessage(), Toast.LENGTH_SHORT).show());
                 })
@@ -176,7 +157,6 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    // --- HELPER: Request Day Off ---
     private void showRequestDialog(String date) {
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Request Day Off")
@@ -203,16 +183,12 @@ public class MainActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
 
-    // --- HELPER: Load User Profile ---
     private void loadUserData(String uid) {
         db.collection("users").document(uid).get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
                         User user = documentSnapshot.toObject(User.class);
-
-                        // --- NEW: Save user to global variable ---
                         this.currentUserData = user;
-                        // -----------------------------------------
 
                         welcomeText.setText("Hello, " + user.getFullName());
                         quotaText.setText("Target Quota: " + user.getShiftQuota());
@@ -237,7 +213,6 @@ public class MainActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> Toast.makeText(this, "Error loading profile", Toast.LENGTH_SHORT).show());
     }
 
-    // --- HELPER: Admin Algorithm Execution ---
     private void runShiftGenerationAlgorithm() {
         db.collection("users").get().addOnSuccessListener(userSnapshots -> {
             List<User> allDoctors = new ArrayList<>();
@@ -300,12 +275,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // --- HELPER: Display Shifts on Calendar ---
+    // --- UPDATED LOAD SHIFTS METHOD ---
     private void loadShiftsToCalendar() {
         db.collection("shifts").get().addOnSuccessListener(snapshots -> {
-
-            // CHANGE 1: List<EventDay> -> List<CalendarDay>
-            List<CalendarDay> events = new ArrayList<>();
+            List<EventDay> events = new ArrayList<>(); // Use EventDay
             String myUid = mAuth.getCurrentUser().getUid();
             int count = 0;
 
@@ -316,19 +289,15 @@ public class MainActivity extends AppCompatActivity {
                     Calendar calendar = Calendar.getInstance();
                     calendar.setTimeInMillis(shift.getStartTime());
 
-                    // CHANGE 2: new EventDay(...) -> new CalendarDay(...)
-                    CalendarDay day = new CalendarDay(calendar);
-                    day.setImageResource(R.drawable.ic_circle_blue);
-                    events.add(day);
-
+                    // Use the constructor: EventDay(Calendar, ImageResource)
+                    events.add(new EventDay(calendar, R.drawable.ic_circle_blue));
                     count++;
                 }
             }
 
             int finalCount = count;
             runOnUiThread(() -> {
-                // CHANGE 3: setEvents -> setCalendarDays
-                calendarView.setCalendarDays(events);
+                calendarView.setEvents(events); // Use setEvents
                 Toast.makeText(MainActivity.this, "Refreshed: " + finalCount + " shifts", Toast.LENGTH_SHORT).show();
             });
         });
